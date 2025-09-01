@@ -1,0 +1,12 @@
+# AI Prompt Executor Requirements
+
+# Core AI SDKs
+anthropic>=0.39.0
+openai>=1.54.0
+
+# Environment and utilities
+python-dotenv>=1.0.0
+
+# Optional: For better async support (if needed in future)
+# aiohttp>=3.9.0
+# httpx>=0.25.0

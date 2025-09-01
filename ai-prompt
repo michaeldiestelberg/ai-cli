@@ -1,0 +1,233 @@
+#!/bin/bash
+
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title AI Prompt
+# @raycast.mode silent
+# @raycast.packageName AI Tools
+# @raycast.icon 🤖
+# @raycast.argument1 { "type": "text", "placeholder": "Enter your prompt", "optional": false }
+# @raycast.argument2 { "type": "text", "placeholder": "Model (optional, default: gpt-5-mini)", "optional": true }
+# @raycast.argument3 { "type": "text", "placeholder": "System prompt (optional)", "optional": true }
+
+# AI Prompt Executor Shell Wrapper
+# Handles virtual environment setup and Python script execution
+# Compatible with both terminal and Raycast execution
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VENV_DIR="$SCRIPT_DIR/.venv"
+PYTHON_SCRIPT="$SCRIPT_DIR/ai_prompt_executor.py"
+REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
+
+# Check if running in Raycast first
+check_is_raycast() {
+    # Raycast sets specific environment variables we can check:
+    # 1. TERM is set to "dumb" in Raycast
+    # 2. __CFBundleIdentifier is "com.raycast.macos"
+    # 3. STDOUT is not a terminal
+    
+    # Check for Raycast bundle identifier (most reliable)
+    if [ "$__CFBundleIdentifier" = "com.raycast.macos" ]; then
+        return 0
+    fi
+    
+    # Check for dumb terminal (Raycast sets TERM=dumb)
+    if [ "$TERM" = "dumb" ]; then
+        return 0
+    fi
+    
+    # Fallback: no TERM_PROGRAM and not a terminal
+    if [ -z "$TERM_PROGRAM" ] && ! [ -t 1 ]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Colors for output (disabled in Raycast)
+if check_is_raycast; then
+    # No colors in Raycast mode
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
+else
+    # Use colors in terminal mode
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m' # No Color
+fi
+
+# Function to print colored messages
+print_message() {
+    local color=$1
+    local message=$2
+    if check_is_raycast; then
+        # No color formatting in Raycast
+        echo "$message"
+    else
+        # Color formatting in terminal
+        echo -e "${color}${message}${NC}"
+    fi
+}
+
+# Check if Python 3.13 or higher is installed
+check_python_version() {
+    if command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+    elif command -v python &> /dev/null; then
+        PYTHON_CMD="python"
+    else
+        print_message "$RED" "❌ Error: Python is not installed"
+        exit 1
+    fi
+    
+    # Check Python version
+    PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    MAJOR_VERSION=$($PYTHON_CMD -c 'import sys; print(sys.version_info.major)')
+    MINOR_VERSION=$($PYTHON_CMD -c 'import sys; print(sys.version_info.minor)')
+    
+    if [[ $MAJOR_VERSION -lt 3 ]] || [[ $MAJOR_VERSION -eq 3 && $MINOR_VERSION -lt 8 ]]; then
+        print_message "$RED" "❌ Error: Python 3.8 or higher is required (found $PYTHON_VERSION)"
+        exit 1
+    fi
+    
+    print_message "$GREEN" "✅ Using Python $PYTHON_VERSION"
+}
+
+# Create virtual environment if it doesn't exist
+setup_venv() {
+    if [ ! -d "$VENV_DIR" ]; then
+        print_message "$YELLOW" "🔧 Creating virtual environment..."
+        $PYTHON_CMD -m venv "$VENV_DIR"
+        if [ $? -ne 0 ]; then
+            print_message "$RED" "❌ Error: Failed to create virtual environment"
+            exit 1
+        fi
+        print_message "$GREEN" "✅ Virtual environment created"
+    fi
+}
+
+# Activate virtual environment
+activate_venv() {
+    source "$VENV_DIR/bin/activate"
+    if [ $? -ne 0 ]; then
+        print_message "$RED" "❌ Error: Failed to activate virtual environment"
+        exit 1
+    fi
+}
+
+# Install or upgrade requirements
+install_requirements() {
+    # Check if requirements file exists
+    if [ ! -f "$REQUIREMENTS_FILE" ]; then
+        print_message "$RED" "❌ Error: requirements.txt not found at $REQUIREMENTS_FILE"
+        exit 1
+    fi
+    
+    # Check if requirements have been installed or updated
+    REQUIREMENTS_HASH_FILE="$VENV_DIR/.requirements_hash"
+    CURRENT_HASH=$(sha256sum "$REQUIREMENTS_FILE" | awk '{print $1}')
+    
+    if [ -f "$REQUIREMENTS_HASH_FILE" ]; then
+        STORED_HASH=$(cat "$REQUIREMENTS_HASH_FILE")
+    else
+        STORED_HASH=""
+    fi
+    
+    if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+        print_message "$YELLOW" "📦 Installing/updating requirements..."
+        
+        # Upgrade pip first
+        pip install --upgrade pip > /dev/null 2>&1
+        
+        # Install requirements
+        pip install -r "$REQUIREMENTS_FILE"
+        if [ $? -ne 0 ]; then
+            print_message "$RED" "❌ Error: Failed to install requirements"
+            exit 1
+        fi
+        
+        # Store the hash of the current requirements
+        echo "$CURRENT_HASH" > "$REQUIREMENTS_HASH_FILE"
+        print_message "$GREEN" "✅ Requirements installed/updated"
+    fi
+}
+
+
+# Main execution
+main() {
+    # Handle Raycast execution
+    if check_is_raycast; then
+        # Raycast provides arguments directly
+        PROMPT="$1"
+        MODEL="${2:-gpt-5-mini}"
+        SYSTEM_PROMPT="$3"
+        
+        # Build command arguments
+        CMD_ARGS=("--prompt" "$PROMPT")
+        
+        if [ -n "$MODEL" ]; then
+            CMD_ARGS+=("--model" "$MODEL")
+        fi
+        
+        if [ -n "$SYSTEM_PROMPT" ]; then
+            CMD_ARGS+=("--system-prompt" "$SYSTEM_PROMPT")
+        fi
+        
+        # Silent setup for Raycast
+        check_python_version > /dev/null 2>&1
+        setup_venv > /dev/null 2>&1
+        activate_venv > /dev/null 2>&1
+        install_requirements > /dev/null 2>&1
+        
+        # Run Python script and capture output
+        OUTPUT=$(python "$PYTHON_SCRIPT" "${CMD_ARGS[@]}" 2>&1)
+        EXIT_CODE=$?
+        
+        if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ Prompt executed successfully!"
+            echo "$OUTPUT" | grep "Output saved to:" | sed 's/.*Output saved to: /📁 /'
+        else
+            echo "❌ Error executing prompt"
+            echo "$OUTPUT"
+        fi
+        
+        deactivate 2>/dev/null
+        exit $EXIT_CODE
+    fi
+    
+    # Regular terminal execution
+    # Check if help is requested or no arguments
+    if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]] || [[ $# -eq 0 ]]; then
+        # Let Python script handle help message
+        check_python_version
+        setup_venv
+        activate_venv
+        install_requirements
+        python "$PYTHON_SCRIPT" "$@"
+        exit $?
+    fi
+    
+    print_message "$GREEN" "🚀 AI Prompt Executor"
+    
+    # Setup environment
+    check_python_version
+    setup_venv
+    activate_venv
+    install_requirements
+    
+    # Run the Python script with all arguments
+    python "$PYTHON_SCRIPT" "$@"
+    EXIT_CODE=$?
+    
+    # Deactivate virtual environment
+    deactivate 2>/dev/null
+    
+    exit $EXIT_CODE
+}
+
+# Run main function with all arguments
+main "$@"

@@ -1,0 +1,36 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Output directory
+ai-output/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Requirements hash (internal tracking)
+.requirements_hash
+
+# Personal prompts (keep example prompts)
+prompts/user/*.txt
+prompts/system/*.txt
+# But include example prompts
+!prompts/system/podcast-insights.txt
