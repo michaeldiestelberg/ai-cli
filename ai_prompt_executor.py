@@ -185,10 +185,15 @@ class AIPromptExecutor:
         
         # Generate output filename
         if output_name:
-            filename = f"{output_name}.txt"
+            # Respect user-provided extension if present; default to .md if none
+            provided_suffix = Path(output_name).suffix
+            if provided_suffix:
+                filename = output_name
+            else:
+                filename = f"{output_name}.md"
         else:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            filename = f"{timestamp}.txt"
+            filename = f"{timestamp}.md"
         
         # Save output to file
         output_file = output_path / filename
@@ -212,12 +217,13 @@ def load_text_from_file_or_string(value: str, prompt_type: str = 'user') -> str:
     # Get script directory for prompt library
     script_dir = Path(__file__).parent
     
-    # First, check if it's a prompt library name (no path separators, no .txt extension)
-    if '/' not in value and '\\' not in value and not value.endswith('.txt'):
-        # Try to load from prompt library
-        prompt_library_path = script_dir / 'prompts' / prompt_type / f"{value}.txt"
-        if prompt_library_path.exists() and prompt_library_path.is_file():
-            return prompt_library_path.read_text(encoding='utf-8').strip()
+    # First, check if it's a prompt library name (no path separators, no extension)
+    if '/' not in value and '\\' not in value and Path(value).suffix == '':
+        # Try to load from prompt library; prefer .md, fallback to .txt
+        for ext in ['.md', '.txt']:
+            prompt_library_path = script_dir / 'prompts' / prompt_type / f"{value}{ext}"
+            if prompt_library_path.exists() and prompt_library_path.is_file():
+                return prompt_library_path.read_text(encoding='utf-8').strip()
     
     # Second, check if it's a file path
     path = Path(value)
@@ -238,11 +244,12 @@ def list_available_prompts():
     # List user prompts
     user_prompts_dir = prompts_dir / 'user'
     if user_prompts_dir.exists():
-        user_prompts = sorted([f.stem for f in user_prompts_dir.glob('*.txt')])
+        user_prompts = sorted({f.stem for f in list(user_prompts_dir.glob('*.md')) + list(user_prompts_dir.glob('*.txt'))})
         if user_prompts:
             print("\n📝 User Prompts:")
             for prompt_name in user_prompts:
-                prompt_file = user_prompts_dir / f"{prompt_name}.txt"
+                # Prefer .md if present, else .txt
+                prompt_file = user_prompts_dir / (f"{prompt_name}.md" if (user_prompts_dir / f"{prompt_name}.md").exists() else f"{prompt_name}.txt")
                 # Try to get first line as description
                 try:
                     first_line = prompt_file.read_text(encoding='utf-8').split('\n')[0][:60]
@@ -258,11 +265,12 @@ def list_available_prompts():
     # List system prompts
     system_prompts_dir = prompts_dir / 'system'
     if system_prompts_dir.exists():
-        system_prompts = sorted([f.stem for f in system_prompts_dir.glob('*.txt')])
+        system_prompts = sorted({f.stem for f in list(system_prompts_dir.glob('*.md')) + list(system_prompts_dir.glob('*.txt'))})
         if system_prompts:
             print("\n🎭 System Prompts:")
             for prompt_name in system_prompts:
-                prompt_file = system_prompts_dir / f"{prompt_name}.txt"
+                # Prefer .md if present, else .txt
+                prompt_file = system_prompts_dir / (f"{prompt_name}.md" if (system_prompts_dir / f"{prompt_name}.md").exists() else f"{prompt_name}.txt")
                 # Try to get first line as description
                 try:
                     first_line = prompt_file.read_text(encoding='utf-8').split('\n')[0][:60]

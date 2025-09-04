@@ -97,15 +97,17 @@ Use a specific model (defaults to GPT-5 Mini):
 
 ### Output
 
-By default, outputs are saved in the `ai-output` directory with timestamps as filenames:
-- Format: `YYYY-MM-DD_HH-MM-SS.txt`
-- Example: `2024-12-31_14-30-45.txt`
+By default, outputs are saved in the `ai-output` directory as Markdown files with timestamped names:
+- Format: `YYYY-MM-DD_HH-MM-SS.md`
+- Example: `2024-12-31_14-30-45.md`
 
 ### Custom Output Location
 
 Output is stored in `ai-output/` by default. Specify where to save the output:
 ```bash
 ./ai-prompt --prompt "Generate code" --output-path ./results --output-name my_code
+# Use a .txt extension if you prefer plain text
+./ai-prompt --prompt "Generate code" --output-name my_code.txt
 ```
 
 ### List Available Models
@@ -165,12 +167,12 @@ The tool includes a prompt library system for reusable prompts:
 ```
 prompts/
 ├── user/           # User prompts
-│   ├── code-review.txt
-│   ├── summarize.txt
+│   ├── code-review.md   # .md or .txt supported
+│   ├── summarize.md
 │   ├── explain.txt
 │   └── debug.txt
 └── system/         # System prompts
-    ├── developer.txt
+    ├── developer.md
     ├── teacher.txt
     ├── assistant.txt
     └── creative.txt
@@ -178,8 +180,8 @@ prompts/
 
 ### Creating Your Own Prompts
 
-1. Add `.txt` files to `prompts/user/` or `prompts/system/`
-2. Use the filename (without .txt) to reference them
+1. Add `.md` or `.txt` files to `prompts/user/` or `prompts/system/`
+2. Use the filename (without extension) to reference them
 3. The first line of the file is shown as description in `--list-prompts`
 
 ### Prompt Resolution Order
@@ -206,7 +208,7 @@ This means you can use:
    - Loads prompts from command line or files
    - Detects which AI provider to use based on model name
    - Executes the prompt with the selected model
-   - Saves the output to a text file
+   - Saves the output to a Markdown file by default (`.md`)
 
 3. **Virtual Environment**:
    - Automatically created in `.venv` directory
